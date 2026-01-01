@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  # Main application service
+  youtube-shorts-factory:
+    build: .
+    container_name: youtube-shorts-factory
+    restart: unless-stopped
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - YOUTUBE_CLIENT_ID=${YOUTUBE_CLIENT_ID}
+      - YOUTUBE_CLIENT_SECRET=${YOUTUBE_CLIENT_SECRET}
+      - DATABASE_URL=sqlite:////app/data/youtube_shorts.db
+      - LOG_LEVEL=INFO
+      - FFMPEG_PATH=/usr/bin/ffmpeg
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    ports:
+      - "8501:8501"  # Streamlit dashboard
+      - "8000:8000"  # FastAPI (if used)
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Optional: Redis for task queue (uncomment if needed)
+  # redis:
+  #   image: redis:7
+  #   container_name: youtube-shorts-redis
+  #   restart: unless-stopped
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis-data:/data
+
+  # Optional: FastAPI service (uncomment if needed)
+  # api:
+  #   build: .
+  #   container_name: youtube-shorts-api
+  #   restart: unless-stopped
+  #   command: ["uvicorn", "app.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+  #   environment:
+  #     - OPENAI_API_KEY=${OPENAI_API_KEY}
+  #     - YOUTUBE_CLIENT_ID=${YOUTUBE_CLIENT_ID}
+  #     - YOUTUBE_CLIENT_SECRET=${YOUTUBE_CLIENT_SECRET}
+  #     - DATABASE_URL=sqlite:////app/data/youtube_shorts.db
+  #   volumes:
+  #     - ./data:/app/data
+  #   ports:
+  #     - "8000:8000"
+  #   depends_on:
+  #     youtube-shorts-factory:
+  #       condition: service_healthy
+
+# Volumes (uncomment if using Redis)
+# volumes:
+#   redis-data:
+
+networks:
+  default:
+    name: youtube-shorts-network
+    driver: bridge

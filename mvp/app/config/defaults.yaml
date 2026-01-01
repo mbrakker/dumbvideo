@@ -1,0 +1,62 @@
+# YouTube Shorts Factory - Default Configuration
+# This file contains default settings that can be overridden via .env or database
+
+# Budget and production limits
+daily_budget: 3.0
+max_videos_per_day: 3
+currency: "EUR"
+
+# Content settings
+default_language: "fr-FR"
+timezone: "Europe/Paris"
+scheduling_window:
+  start_hour: 12
+  end_hour: 20
+
+# AI Models
+openai_model: "gpt-4o"
+tts_model: "tts-1"
+image_model: "dall-e-3"
+
+# Video specifications
+default_duration_seconds: 7
+default_resolution:
+  width: 1080
+  height: 1920
+default_fps: 30
+
+# Audio settings
+music_lufs_target: -28.0
+voice_volume: -12.0
+music_volume: -20.0
+
+# Visual style
+caption_style: "dynamic"
+motion_style: "cuts_zoom_shake"
+font_pool: ["Arial", "Comic Sans MS", "Impact"]
+color_presets: ["vibrant", "pastel", "monochrome"]
+
+# Format weights (initial equal distribution)
+format_weights:
+  talking_object: 1.0
+  absurd_motivation: 1.0
+  nothing_happens: 1.0
+
+# Safety settings
+safety_threshold: 0.9
+max_regeneration_attempts: 3
+blacklisted_keywords:
+  - "copyright"
+  - "brand"
+  - "celebrity"
+  - "politics"
+  - "news"
+  - "sexual"
+  - "profanity"
+  - "medical"
+  - "financial"
+
+# System settings
+kill_switch_enabled: false
+automation_enabled: true
+log_level: "INFO"
