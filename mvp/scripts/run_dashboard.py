@@ -122,13 +122,13 @@ class Dashboard:
             col1, col2 = st.columns(2)
 
             with col1:
-                automation_enabled = session.query(Config).filter_by(key="automation_enabled").first()
-                automation_status = "✅ Enabled" if automation_enabled and automation_enabled.value.get("value", False) else "❌ Disabled"
+                automation_config = session.query(Config).filter_by(key="automation_enabled").first()
+                automation_status = "✅ Enabled" if automation_config and automation_config.value else "❌ Disabled"
                 st.write(f"**Automation:** {automation_status}")
 
             with col2:
                 kill_switch = session.query(Config).filter_by(key="kill_switch_enabled").first()
-                kill_status = "❌ Not Active" if not kill_switch or not kill_switch.value.get("value", False) else "⚠️ ACTIVE"
+                kill_status = "❌ Not Active" if not kill_switch or not kill_switch.value else "⚠️ ACTIVE"
                 st.write(f"**Kill Switch:** {kill_status}")
 
         finally:
