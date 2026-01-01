@@ -6,11 +6,16 @@ Sets up SQLite database with required tables and initial data
 """
 
 import os
+import sys
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from app.db.models import Base, FormatWeight, Config, VideoFormat
 from datetime import datetime
 import logging
+
+# Add the parent directory to Python path so we can import from app module
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from app.db.models import Base, FormatWeight, Config, VideoFormat
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
