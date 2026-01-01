@@ -11,6 +11,7 @@ import random
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 import openai
+from textwrap import dedent
 from app.utils.logging import get_logger
 from app.config.schema import VideoFormat, EpisodeConfig
 from app.services.safety.content_safety import ContentSafetyChecker
@@ -129,159 +130,189 @@ class EpisodeGenerator:
 
     def _generate_talking_object_prompt(self, config: EpisodeConfig) -> str:
         """Generate talking object format prompt"""
-        return f"""Generate a funny French short video script in the "Talking Object" format.
+        template = dedent(
+            """
+            Generate a funny French short video script in the "Talking Object" format.
 
-REQUIREMENTS:
-- Language: French (France)
-- Duration: {config.min_duration}-{config.max_duration} seconds when spoken
-- Format: A single inanimate object that talks directly to the viewer
-- Tone: Absurd, humorous, lighthearted
-- Content: Completely original, no real people/brands/politics
-- Structure: Hook -> Main content -> Punchline
+            REQUIREMENTS:
+            - Language: French (France)
+            - Duration: {min_duration}-{max_duration} seconds when spoken
+            - Format: A single inanimate object that talks directly to the viewer
+            - Tone: Absurd, humorous, lighthearted
+            - Content: Completely original, no real people/brands/politics
+            - Structure: Hook -> Main content -> Punchline
 
-OUTPUT STRUCTURE (JSON only, no explanation):
-{{
-  "format": "talking_object",
-  "language": "fr-FR",
-  "hook_text": "[1-2 second attention-grabbing opening line in French]",
-  "script": "[Full script in French, 6-8 seconds when spoken]",
-  "on_screen_captions": [
-    {"start_ms": 0, "end_ms": 2000, "text": "[French caption text]"},
-    {"start_ms": 2000, "end_ms": 4000, "text": "[French caption text]"}
-  ],
-  "title_options": [
-    "[Funny French title option 1]",
-    "[Funny French title option 2]",
-    "[Funny French title option 3]"
-  ],
-  "description": "[Short French description for YouTube, 1-2 sentences]",
-  "hashtags": ["#shorts", "#humour", "#absurde"],
-  "image_prompt": "[Detailed DALL-E-3 prompt for a simple, original image featuring the talking object]",
-  "visual_recipe": {{
-    "motion": "cuts_zoom_shake",
-    "color_preset": "vibrant",
-    "caption_style": "dynamic",
-    "font": "Arial"
-  }},
-  "audio_recipe": {{
-    "voice_preset": "friendly_french_male",
-    "music_track_id": "yt_audio_library_upbeat_1",
-    "music_lufs_target": -28
-  }}
-}}
+            OUTPUT STRUCTURE (JSON only, no explanation):
+            {{
+              "format": "{format_value}",
+              "language": "fr-FR",
+              "hook_text": "[1-2 second attention-grabbing opening line in French]",
+              "script": "[Full script in French, 6-8 seconds when spoken]",
+              "on_screen_captions": [
+                {{"start_ms": 0, "end_ms": 2000, "text": "[French caption text]"}},
+                {{"start_ms": 2000, "end_ms": 4000, "text": "[French caption text]"}}
+              ],
+              "title_options": [
+                "[Funny French title option 1]",
+                "[Funny French title option 2]",
+                "[Funny French title option 3]"
+              ],
+              "description": "[Short French description for YouTube, 1-2 sentences]",
+              "hashtags": ["#shorts", "#humour", "#absurde"],
+              "image_prompt": "[Detailed DALL-E-3 prompt for a simple, original image featuring the talking object]",
+              "visual_recipe": {{
+                "motion": "cuts_zoom_shake",
+                "color_preset": "vibrant",
+                "caption_style": "dynamic",
+                "font": "Arial"
+              }},
+              "audio_recipe": {{
+                "voice_preset": "friendly_french_male",
+                "music_track_id": "yt_audio_library_upbeat_1",
+                "music_lufs_target": -28
+              }}
+            }}
 
-EXAMPLE IDEAS (choose one or create your own):
-- A sentient toaster complaining about breakfast
-- A philosophical banana questioning its existence
-- A sarcastic rubber duck giving life advice
-- A dramatic houseplant begging for water
-- A confused lamp that thinks it's a disco ball
+            EXAMPLE IDEAS (choose one or create your own):
+            - A sentient toaster complaining about breakfast
+            - A philosophical banana questioning its existence
+            - A sarcastic rubber duck giving life advice
+            - A dramatic houseplant begging for water
+            - A confused lamp that thinks it's a disco ball
 
-IMPORTANT: Respond with ONLY the JSON object, no additional text or explanation."""
+            IMPORTANT: Respond with ONLY the JSON object, no additional text or explanation.
+            """
+        ).strip()
+
+        return template.format(
+            min_duration=config.min_duration,
+            max_duration=config.max_duration,
+            format_value=VideoFormat.TALKING_OBJECT.value,
+        )
 
     def _generate_absurd_motivation_prompt(self, config: EpisodeConfig) -> str:
         """Generate absurd motivation format prompt"""
-        return f"""Generate a funny French short video script in the "Absurd Motivation" format.
+        template = dedent(
+            """
+            Generate a funny French short video script in the "Absurd Motivation" format.
 
-REQUIREMENTS:
-- Language: French (France)
-- Duration: {config.min_duration}-{config.max_duration} seconds when spoken
-- Format: Motivational speech about a completely ridiculous goal
-- Tone: Over-the-top motivational, inspirational, humorous
-- Content: Completely original, no real people/brands/politics
-- Structure: Problem -> Absurd solution -> Call to inaction
+            REQUIREMENTS:
+            - Language: French (France)
+            - Duration: {min_duration}-{max_duration} seconds when spoken
+            - Format: Motivational speech about a completely ridiculous goal
+            - Tone: Over-the-top motivational, inspirational, humorous
+            - Content: Completely original, no real people/brands/politics
+            - Structure: Problem -> Absurd solution -> Call to inaction
 
-OUTPUT STRUCTURE (JSON only, no explanation):
-{{
-  "format": "absurd_motivation",
-  "language": "fr-FR",
-  "hook_text": "[1-2 second attention-grabbing motivational opening in French]",
-  "script": "[Full motivational script in French, 6-8 seconds when spoken]",
-  "on_screen_captions": [
-    {{"start_ms": [start_time_in_ms], "end_ms": [end_time_in_ms], "text": "[French caption text]}},
-    {{"start_ms": [start_time_in_ms], "end_ms": [end_time_in_ms], "text": "[French caption text]"}
-  ],
-  "title_options": [
-    "[Motivational-sounding but absurd French title 1]",
-    "[Motivational-sounding but absurd French title 2]",
-    "[Motivational-sounding but absurd French title 3]"
-  ],
-  "description": "[Short French description for YouTube, 1-2 sentences]",
-  "hashtags": ["#shorts", "#motivation", "#absurde"],
-  "image_prompt": "[DALL-E-3 prompt for a colorful, motivational-style image]",
-  "visual_recipe": {{
-    "motion": "cuts_zoom_shake",
-    "color_preset": "vibrant",
-    "caption_style": "dynamic",
-    "font": "Impact"
-  }},
-  "audio_recipe": {{
-    "voice_preset": "motivational_french_male",
-    "music_track_id": "yt_audio_library_inspirational_1",
-    "music_lufs_target": -28
-  }}
-}}
+            OUTPUT STRUCTURE (JSON only, no explanation):
+            {{
+              "format": "{format_value}",
+              "language": "fr-FR",
+              "hook_text": "[1-2 second attention-grabbing motivational opening in French]",
+              "script": "[Full motivational script in French, 6-8 seconds when spoken]",
+              "on_screen_captions": [
+                {{"start_ms": 0, "end_ms": 2000, "text": "[French caption text]"}},
+                {{"start_ms": 2000, "end_ms": 4000, "text": "[French caption text]"}}
+              ],
+              "title_options": [
+                "[Motivational-sounding but absurd French title 1]",
+                "[Motivational-sounding but absurd French title 2]",
+                "[Motivational-sounding but absurd French title 3]"
+              ],
+              "description": "[Short French description for YouTube, 1-2 sentences]",
+              "hashtags": ["#shorts", "#motivation", "#absurde"],
+              "image_prompt": "[DALL-E-3 prompt for a colorful, motivational-style image]",
+              "visual_recipe": {{
+                "motion": "cuts_zoom_shake",
+                "color_preset": "vibrant",
+                "caption_style": "dynamic",
+                "font": "Impact"
+              }},
+              "audio_recipe": {{
+                "voice_preset": "motivational_french_male",
+                "music_track_id": "yt_audio_library_inspirational_1",
+                "music_lufs_target": -28
+              }}
+            }}
 
-EXAMPLE IDEAS (choose one or create your own):
-- "How to become a professional couch potato"
-- "Mastering the art of strategic procrastination"
-- "The secret to perfecting your staring-into-space technique"
-- "10 steps to winning at doing absolutely nothing"
-- "Becoming the world's most average person"
+            EXAMPLE IDEAS (choose one or create your own):
+            - "How to become a professional couch potato"
+            - "Mastering the art of strategic procrastination"
+            - "The secret to perfecting your staring-into-space technique"
+            - "10 steps to winning at doing absolutely nothing"
+            - "Becoming the world's most average person"
 
-IMPORTANT: Respond with ONLY the JSON object, no additional text or explanation."""
+            IMPORTANT: Respond with ONLY the JSON object, no additional text or explanation.
+            """
+        ).strip()
+
+        return template.format(
+            min_duration=config.min_duration,
+            max_duration=config.max_duration,
+            format_value=VideoFormat.ABSURD_MOTIVATION.value,
+        )
 
     def _generate_nothing_happens_prompt(self, config: EpisodeConfig) -> str:
         """Generate nothing happens format prompt"""
-        return f"""Generate a funny French short video script in the "Nothing Happens" format.
+        template = dedent(
+            """
+            Generate a funny French short video script in the "Nothing Happens" format.
 
-REQUIREMENTS:
-- Language: French (France)
-- Duration: {config.min_duration}-{config.max_duration} seconds when spoken
-- Format: Build-up to an anti-climax where nothing happens
-- Tone: Dramatic build-up, deadpan delivery, humorous disappointment
-- Content: Completely original, no real people/brands/politics
-- Structure: Dramatic setup -> Expectation building -> Nothing happens
+            REQUIREMENTS:
+            - Language: French (France)
+            - Duration: {min_duration}-{max_duration} seconds when spoken
+            - Format: Build-up to an anti-climax where nothing happens
+            - Tone: Dramatic build-up, deadpan delivery, humorous disappointment
+            - Content: Completely original, no real people/brands/politics
+            - Structure: Dramatic setup -> Expectation building -> Nothing happens
 
-OUTPUT STRUCTURE (JSON only, no explanation):
-{{
-  "format": "nothing_happens",
-  "language": "fr-FR",
-  "hook_text": "[1-2 second intriguing opening line in French]",
-  "script": "[Full script in French building to anti-climax, 6-8 seconds when spoken]",
-  "on_screen_captions": [
-    {{"start_ms": [start_time_in_ms], "end_ms": [end_time_in_ms], "text": "[French caption text]}},
-    {{"start_ms": [start_time_in_ms], "end_ms": [end_time_in_ms], "text": "[French caption text]"}
-  ],
-  "title_options": [
-    "[Dramatic but ultimately boring French title 1]",
-    "[Dramatic but ultimately boring French title 2]",
-    "[Dramatic but ultimately boring French title 3]"
-  ],
-  "description": "[Short French description for YouTube, 1-2 sentences]",
-  "hashtags": ["#shorts", "#ennuyeux", "#anticipation"],
-  "image_prompt": "[DALL-E-3 prompt for a completely ordinary, mundane scene]",
-  "visual_recipe": {{
-    "motion": "static",
-    "color_preset": "monochrome",
-    "caption_style": "static",
-    "font": "Arial"
-  }},
-  "audio_recipe": {{
-    "voice_preset": "dramatic_french_male",
-    "music_track_id": "yt_audio_library_dramatic_1",
-    "music_lufs_target": -28
-  }}
-}}
+            OUTPUT STRUCTURE (JSON only, no explanation):
+            {{
+              "format": "{format_value}",
+              "language": "fr-FR",
+              "hook_text": "[1-2 second intriguing opening line in French]",
+              "script": "[Full script in French building to anti-climax, 6-8 seconds when spoken]",
+              "on_screen_captions": [
+                {{"start_ms": 0, "end_ms": 2000, "text": "[French caption text]"}},
+                {{"start_ms": 2000, "end_ms": 4000, "text": "[French caption text]"}}
+              ],
+              "title_options": [
+                "[Dramatic but ultimately boring French title 1]",
+                "[Dramatic but ultimately boring French title 2]",
+                "[Dramatic but ultimately boring French title 3]"
+              ],
+              "description": "[Short French description for YouTube, 1-2 sentences]",
+              "hashtags": ["#shorts", "#ennuyeux", "#anticipation"],
+              "image_prompt": "[DALL-E-3 prompt for a completely ordinary, mundane scene]",
+              "visual_recipe": {{
+                "motion": "static",
+                "color_preset": "monochrome",
+                "caption_style": "static",
+                "font": "Arial"
+              }},
+              "audio_recipe": {{
+                "voice_preset": "dramatic_french_male",
+                "music_track_id": "yt_audio_library_dramatic_1",
+                "music_lufs_target": -28
+              }}
+            }}
 
-EXAMPLE IDEAS (choose one or create your own):
-- "The most exciting thing that happened today... nothing"
-- "Watch as this man attempts to do something interesting... and fails"
-- "The dramatic conclusion you've been waiting for... still waiting"
-- "An ordinary street where absolutely nothing happens"
-- "The thrilling adventure of a completely still object"
+            EXAMPLE IDEAS (choose one or create your own):
+            - "The most exciting thing that happened today... nothing"
+            - "Watch as this man attempts to do something interesting... and fails"
+            - "The dramatic conclusion you've been waiting for... still waiting"
+            - "An ordinary street where absolutely nothing happens"
+            - "The thrilling adventure of a completely still object"
 
-IMPORTANT: Respond with ONLY the JSON object, no additional text or explanation."""
+            IMPORTANT: Respond with ONLY the JSON object, no additional text or explanation.
+            """
+        ).strip()
+
+        return template.format(
+            min_duration=config.min_duration,
+            max_duration=config.max_duration,
+            format_value=VideoFormat.NOTHING_HAPPENS.value,
+        )
 
     def _call_openai_api(self, prompt: str, config: EpisodeConfig) -> Dict:
         """Call OpenAI API with structured output"""
