@@ -12,11 +12,15 @@ from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 import openai
 from textwrap import dedent
+from dotenv import load_dotenv
 from app.utils.logging import get_logger
 from app.config.schema import VideoFormat, EpisodeConfig
 from app.services.safety.content_safety import ContentSafetyChecker
 from app.utils.pricing import CostCalculator
 from app.db.models import Job, VideoStatus
+
+# Load environment variables
+load_dotenv()
 
 logger = get_logger(__name__)
 

@@ -149,11 +149,11 @@ class Dashboard:
                 automation_config = session.query(Config).filter_by(key="automation_enabled").first()
                 automation_enabled = st.toggle(
                     "Enable Automation",
-                    value=automation_config.value.get("value", False) if automation_config else False
+                    value=automation_config.value if automation_config else False
                 )
 
-                if automation_enabled != (automation_config.value.get("value", False) if automation_config else False):
-                    automation_config.value["value"] = automation_enabled
+                if automation_enabled != (automation_config.value if automation_config else False):
+                    automation_config.value = automation_enabled
                     automation_config.updated_at = datetime.utcnow()
                     session.commit()
                     st.success("Automation setting updated")
@@ -162,12 +162,12 @@ class Dashboard:
                 kill_switch_config = session.query(Config).filter_by(key="kill_switch_enabled").first()
                 kill_switch_enabled = st.toggle(
                     "🚨 Kill Switch (STOP ALL PROCESSING)",
-                    value=kill_switch_config.value.get("value", False) if kill_switch_config else False,
+                    value=kill_switch_config.value if kill_switch_config else False,
                     help="Immediately stops all processing and prevents new jobs"
                 )
 
-                if kill_switch_enabled != (kill_switch_config.value.get("value", False) if kill_switch_config else False):
-                    kill_switch_config.value["value"] = kill_switch_enabled
+                if kill_switch_enabled != (kill_switch_config.value if kill_switch_config else False):
+                    kill_switch_config.value = kill_switch_enabled
                     kill_switch_config.updated_at = datetime.utcnow()
                     session.commit()
                     st.warning("Kill switch updated - all processing stopped")
@@ -180,12 +180,12 @@ class Dashboard:
                 "Daily Budget (€)",
                 min_value=1.0,
                 max_value=100.0,
-                value=budget_config.value.get("value", 3.0) if budget_config else 3.0,
+                value=budget_config.value if budget_config else 3.0,
                 step=0.5
             )
 
             if st.button("Update Budget"):
-                budget_config.value["value"] = new_budget
+                budget_config.value = new_budget
                 budget_config.updated_at = datetime.utcnow()
                 session.commit()
                 st.success("Budget updated")
