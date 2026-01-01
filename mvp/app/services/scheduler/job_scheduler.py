@@ -8,7 +8,7 @@ import os
 import uuid
 import random
 from datetime import datetime, timedelta
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict
 from app.utils.logging import get_logger
 from app.config.schema import VideoFormat, EpisodeConfig
 from app.db.models import Job, VideoStatus, CostTracking, FormatWeight
