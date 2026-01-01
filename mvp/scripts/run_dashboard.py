@@ -54,7 +54,7 @@ class Dashboard:
         # Sidebar navigation
         page = st.sidebar.radio(
             "Navigation",
-            ["📊 Overview", "⚙️ Settings", "🎬 Jobs", "📈 Analytics", "🔄 Optimization"]
+            ["📊 Overview", "⚙️ Settings", "🎬 Jobs", "📈 Analytics", "🔄 Optimization", "🗃️ Database Explorer"]
         )
 
         if page == "📊 Overview":
@@ -67,6 +67,8 @@ class Dashboard:
             self._show_analytics()
         elif page == "🔄 Optimization":
             self._show_optimization()
+        elif page == "🗃️ Database Explorer":
+            self._show_database_explorer()
 
     def _show_overview(self):
         """Show system overview"""
@@ -180,12 +182,12 @@ class Dashboard:
                 "Daily Budget (€)",
                 min_value=1.0,
                 max_value=100.0,
-                value=budget_config.value if budget_config else 3.0,
+                value=float(budget_config.value["value"]) if budget_config else 3.0,
                 step=0.5
             )
 
             if st.button("Update Budget"):
-                budget_config.value = new_budget
+                budget_config.value = {"value": new_budget, "currency": "EUR"}
                 budget_config.updated_at = datetime.utcnow()
                 session.commit()
                 st.success("Budget updated")
@@ -417,6 +419,328 @@ class Dashboard:
 
                 history_df = pd.DataFrame(history_data)
                 st.dataframe(history_df)
+
+        finally:
+            session.close()
+
+    def _show_database_explorer(self):
+        """Show comprehensive database explorer with advanced filtering and export capabilities"""
+        st.header("🗃️ Database Explorer")
+        st.markdown("Comprehensive YouTube Shorts database viewer with advanced filtering and analytics")
+
+        session = Session()
+        try:
+            # Database statistics overview
+            st.subheader("📊 Database Statistics")
+
+            total_jobs = session.query(Job).count()
+            completed_jobs = session.query(Job).filter_by(status=VideoStatus.COMPLETED).count()
+            failed_jobs = session.query(Job).filter_by(status=VideoStatus.FAILED).count()
+            pending_jobs = session.query(Job).filter_by(status=VideoStatus.PENDING).count()
+            processing_jobs = session.query(Job).filter(Job.status.in_([VideoStatus.GENERATING, VideoStatus.RENDERING, VideoStatus.UPLOADING])).count()
+            total_metrics = session.query(VideoMetric).count()
+
+            col1, col2, col3, col4, col5, col6 = st.columns(6)
+            col1.metric("Total Jobs", total_jobs)
+            col2.metric("Completed", completed_jobs)
+            col3.metric("Failed", failed_jobs)
+            col4.metric("Pending", pending_jobs)
+            col5.metric("Processing", processing_jobs)
+            col6.metric("Metrics", total_metrics)
+
+            # Advanced filtering section
+            st.subheader("🔍 Advanced Filters")
+
+            col1, col2, col3, col4 = st.columns(4)
+
+            with col1:
+                # Status filter
+                status_filter = st.multiselect(
+                    "Status",
+                    [status.value for status in VideoStatus],
+                    default=[status.value for status in VideoStatus]
+                )
+
+            with col2:
+                # Format filter
+                format_filter = st.multiselect(
+                    "Format",
+                    [fmt.value for fmt in VideoFormat],
+                    default=[fmt.value for fmt in VideoFormat]
+                )
+
+            with col3:
+                # Date range filter
+                date_range = st.date_input(
+                    "Date Range",
+                    value=[datetime.now() - timedelta(days=30), datetime.now()],
+                    min_value=datetime(2023, 1, 1),
+                    max_value=datetime.now()
+                )
+
+            with col4:
+                # YouTube upload status filter
+                youtube_filter = st.selectbox(
+                    "YouTube Status",
+                    ["All", "Uploaded", "Not Uploaded"]
+                )
+
+            # Search functionality
+            search_query = st.text_input("🔎 Search by title, ID, or YouTube ID", "")
+
+            # Apply filters and get data
+            query = session.query(Job)
+
+            # Apply status filter
+            if status_filter:
+                query = query.filter(Job.status.in_(status_filter))
+
+            # Apply format filter
+            if format_filter:
+                query = query.filter(Job.format.in_(format_filter))
+
+            # Apply date range filter
+            if len(date_range) == 2:
+                start_date, end_date = date_range
+                query = query.filter(
+                    Job.created_at >= datetime.combine(start_date, datetime.min.time()),
+                    Job.created_at <= datetime.combine(end_date, datetime.max.time())
+                )
+
+            # Apply YouTube filter
+            if youtube_filter == "Uploaded":
+                query = query.filter(Job.youtube_id.isnot(None))
+            elif youtube_filter == "Not Uploaded":
+                query = query.filter(Job.youtube_id.is_(None))
+
+            # Apply search filter
+            if search_query:
+                query = query.filter(
+                    Job.id.ilike(f"%{search_query}%") |
+                    Job.youtube_id.ilike(f"%{search_query}%") |
+                    Job.episode_data.ilike(f"%{search_query}%")
+                )
+
+            # Get filtered jobs
+            filtered_jobs = query.order_by(Job.created_at.desc()).all()
+
+            st.info(f"Found {len(filtered_jobs)} jobs matching filters")
+
+            if filtered_jobs:
+                # Convert to DataFrame with comprehensive data
+                job_data = []
+                for job in filtered_jobs:
+                    episode_data = job.episode_data or {}
+                    metrics_data = {}
+
+                    # Aggregate metrics if available
+                    if job.metrics:
+                        total_views = sum(m.views for m in job.metrics)
+                        total_likes = sum(m.likes for m in job.metrics)
+                        avg_view_pct = sum(m.avg_view_percentage for m in job.metrics) / len(job.metrics) if job.metrics else 0
+                        metrics_data = {
+                            "total_views": total_views,
+                            "total_likes": total_likes,
+                            "avg_view_pct": avg_view_pct
+                        }
+
+                    job_data.append({
+                        "ID": job.id,
+                        "Format": job.format,
+                        "Status": job.status,
+                        "Created": job.created_at.strftime("%Y-%m-%d %H:%M"),
+                        "Updated": job.updated_at.strftime("%Y-%m-%d %H:%M"),
+                        "Title": episode_data.get("title_options", ["Untitled"])[0],
+                        "YouTube ID": job.youtube_id or "Not uploaded",
+                        "Scheduled": job.scheduled_publish_time.strftime("%Y-%m-%d %H:%M") if job.scheduled_publish_time else "Not scheduled",
+                        "Published": job.actual_publish_time.strftime("%Y-%m-%d %H:%M") if job.actual_publish_time else "Not published",
+                        "Generation Cost": f"€{job.generation_cost:.2f}",
+                        "Render Cost": f"€{job.render_cost:.2f}",
+                        "Total Cost": f"€{job.generation_cost + job.render_cost:.2f}",
+                        "Retries": job.retry_count,
+                        "Error": job.error_message or "None",
+                        "Total Views": metrics_data.get("total_views", 0),
+                        "Total Likes": metrics_data.get("total_likes", 0),
+                        "Avg View %": f"{metrics_data.get('avg_view_pct', 0):.1f}%",
+                        "Privacy": job.privacy_status
+                    })
+
+                df = pd.DataFrame(job_data)
+
+                # Display with AgGrid for advanced features
+                try:
+                    from st_aggrid import AgGrid, GridOptionsBuilder
+
+                    gb = GridOptionsBuilder.from_dataframe(df)
+                    gb.configure_pagination(paginationAutoPageSize=True)
+                    gb.configure_side_bar()
+                    gb.configure_default_column(
+                        filterable=True,
+                        sortable=True,
+                        resizable=True,
+                        wrapHeaderText=True,
+                        autoHeaderHeight=True
+                    )
+
+                    # Custom column configurations
+                    gb.configure_column("ID", pinned="left")
+                    gb.configure_column("Title", width=200)
+                    gb.configure_column("Error", width=150, wrapText=True)
+
+                    grid_options = gb.build()
+                    grid_response = AgGrid(
+                        df,
+                        gridOptions=grid_options,
+                        height=500,
+                        key="database_grid"
+                    )
+
+                    # Export functionality
+                    st.subheader("📤 Export Data")
+
+                    col1, col2, col3 = st.columns(3)
+
+                    with col1:
+                        if st.button("📥 Export to CSV"):
+                            csv = df.to_csv(index=False)
+                            st.download_button(
+                                label="Download CSV",
+                                data=csv,
+                                file_name=f"youtube_shorts_database_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                                mime="text/csv"
+                            )
+
+                    with col2:
+                        if st.button("📥 Export to JSON"):
+                            json_data = df.to_json(orient="records", indent=2)
+                            st.download_button(
+                                label="Download JSON",
+                                data=json_data,
+                                file_name=f"youtube_shorts_database_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                                mime="application/json"
+                            )
+
+                    with col3:
+                        if st.button("📥 Export to Excel"):
+                            try:
+                                excel_file = df.to_excel(f"temp_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx", index=False)
+                                with open(excel_file, "rb") as f:
+                                    st.download_button(
+                                        label="Download Excel",
+                                        data=f,
+                                        file_name=f"youtube_shorts_database_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                    )
+                            except ImportError:
+                                st.warning("Excel export requires openpyxl library")
+
+                    # Detailed view for selected job
+                    st.subheader("🔎 Detailed Job View")
+
+                    selected_job_id = st.selectbox(
+                        "Select job for detailed view",
+                        [job.id for job in filtered_jobs],
+                        format_func=lambda x: next(job.episode_data.get("title_options", ["Untitled"])[0] for job in filtered_jobs if job.id == x)
+                    )
+
+                    selected_job = next(job for job in filtered_jobs if job.id == selected_job_id)
+
+                    # Job metadata
+                    col1, col2, col3 = st.columns(3)
+
+                    with col1:
+                        st.write("**Job Information**")
+                        st.write(f"ID: {selected_job.id}")
+                        st.write(f"Status: {selected_job.status}")
+                        st.write(f"Format: {selected_job.format}")
+                        st.write(f"Created: {selected_job.created_at}")
+                        st.write(f"Updated: {selected_job.updated_at}")
+
+                    with col2:
+                        st.write("**YouTube Information**")
+                        st.write(f"ID: {selected_job.youtube_id or 'Not uploaded'}")
+                        st.write(f"Scheduled: {selected_job.scheduled_publish_time or 'Not scheduled'}")
+                        st.write(f"Published: {selected_job.actual_publish_time or 'Not published'}")
+                        st.write(f"Privacy: {selected_job.privacy_status}")
+
+                    with col3:
+                        st.write("**Cost Information**")
+                        st.write(f"Generation: €{selected_job.generation_cost:.2f}")
+                        st.write(f"Render: €{selected_job.render_cost:.2f}")
+                        st.write(f"Total: €{selected_job.generation_cost + selected_job.render_cost:.2f}")
+                        st.write(f"Retries: {selected_job.retry_count}")
+
+                    # Episode data
+                    if selected_job.episode_data:
+                        st.write("**Episode Data**")
+                        episode_df = pd.DataFrame.from_dict(selected_job.episode_data, orient="index")
+                        st.dataframe(episode_df)
+
+                    # Performance metrics
+                    if selected_job.metrics:
+                        st.write("**Performance Metrics**")
+
+                        metrics_data = []
+                        for metric in selected_job.metrics:
+                            metrics_data.append({
+                                "Window": metric.window,
+                                "Views": metric.views,
+                                "Likes": metric.likes,
+                                "Comments": metric.comments,
+                                "Avg Duration (s)": metric.avg_view_duration,
+                                "Avg View %": f"{metric.avg_view_percentage:.1f}%",
+                                "Subscribers Gained": metric.subscribers_gained,
+                                "Timestamp": metric.timestamp
+                            })
+
+                        metrics_df = pd.DataFrame(metrics_data)
+                        st.dataframe(metrics_df)
+
+                        # Create charts
+                        col1, col2 = st.columns(2)
+
+                        with col1:
+                            st.write("**Views & Likes Over Time**")
+                            st.line_chart(metrics_df.set_index("Window")[["Views", "Likes"]])
+
+                        with col2:
+                            st.write("**Engagement Metrics**")
+                            st.bar_chart(metrics_df.set_index("Window")[["Avg View %", "Subscribers Gained"]])
+
+                    # Error information
+                    if selected_job.error_message:
+                        st.error(f"**Error Information:** {selected_job.error_message}")
+
+                except ImportError:
+                    st.dataframe(df)
+
+                    # Basic export functionality without AgGrid
+                    st.subheader("📤 Export Data")
+
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        if st.button("📥 Export to CSV"):
+                            csv = df.to_csv(index=False)
+                            st.download_button(
+                                label="Download CSV",
+                                data=csv,
+                                file_name=f"youtube_shorts_database_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                                mime="text/csv"
+                            )
+
+                    with col2:
+                        if st.button("📥 Export to JSON"):
+                            json_data = df.to_json(orient="records", indent=2)
+                            st.download_button(
+                                label="Download JSON",
+                                data=json_data,
+                                file_name=f"youtube_shorts_database_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                                mime="application/json"
+                            )
+
+            else:
+                st.info("No jobs found matching the current filters. Try adjusting your filter criteria.")
 
         finally:
             session.close()
