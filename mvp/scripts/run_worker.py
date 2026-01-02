@@ -236,9 +236,8 @@ class Worker:
 
             # Render video
             video_path = self.renderer.render_video(
-                episode=episode,
-                output_path=output_path,
-                format=job.format
+                episode_data=episode,
+                output_path=output_path
             )
 
             return video_path
