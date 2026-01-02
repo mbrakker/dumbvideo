@@ -100,7 +100,7 @@ class Worker:
         try:
             from app.db.models import Config
             kill_switch = session.query(Config).filter_by(key="kill_switch_enabled").first()
-            if kill_switch and kill_switch.value.get("value", False):
+            if kill_switch and kill_switch.value:
                 self.kill_switch_enabled = True
                 return True
             return False

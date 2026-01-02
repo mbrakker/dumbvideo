@@ -39,3 +39,7 @@ venv.bak/
 # System
 .DS_Store
 Thumbs.db
+
+# Logs
+logs/
+mvp/logs/
