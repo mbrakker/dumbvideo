@@ -224,6 +224,51 @@ class Dashboard:
                 st.info("Manual run triggered - worker will process this request")
                 self.logger.info("Manual run triggered from dashboard")
 
+            if st.button("🚀 Run Worker"):
+                # Start the worker process
+                import subprocess
+                import sys
+                import os
+
+                # Get the path to run_worker.py
+                worker_path = os.path.join(os.path.dirname(__file__), "run_worker.py")
+
+                try:
+                    # Start worker in background
+                    process = subprocess.Popen(
+                        [sys.executable, worker_path],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True
+                    )
+
+                    st.success("Worker started successfully!")
+                    self.logger.info("Worker started from dashboard", process_id=process.pid)
+
+                    # Store process reference for potential future management
+                    if not hasattr(st.session_state, 'worker_process'):
+                        st.session_state.worker_process = process
+                    else:
+                        # Clean up old process if exists
+                        old_process = st.session_state.worker_process
+                        if old_process and old_process.poll() is None:
+                            old_process.terminate()
+                        st.session_state.worker_process = process
+
+                except Exception as e:
+                    st.error(f"Failed to start worker: {str(e)}")
+                    self.logger.error("Failed to start worker from dashboard", error=str(e))
+
+            # Worker status monitoring
+            if hasattr(st.session_state, 'worker_process') and st.session_state.worker_process:
+                worker_process = st.session_state.worker_process
+                if worker_process.poll() is None:
+                    st.info("✅ Worker is running (PID: " + str(worker_process.pid) + ")")
+                else:
+                    st.warning("⚠️ Worker process has terminated")
+                    # Clean up terminated process
+                    del st.session_state.worker_process
+
         finally:
             session.close()
 
@@ -748,3 +793,12 @@ class Dashboard:
 if __name__ == "__main__":
     dashboard = Dashboard()
     dashboard.run()
+
+    # Clean up worker process on dashboard exit
+    if hasattr(st.session_state, 'worker_process') and st.session_state.worker_process:
+        worker_process = st.session_state.worker_process
+        if worker_process.poll() is None:  # Process is still running
+            worker_process.terminate()
+            worker_process.wait()
+            st.session_state.worker_process = None
+            logger.info("Worker process cleaned up on dashboard exit")
