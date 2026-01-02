@@ -10,7 +10,6 @@ import time
 import random
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
-import openai
 from textwrap import dedent
 from dotenv import load_dotenv
 from app.utils.logging import get_logger
@@ -35,8 +34,8 @@ class EpisodeGenerator:
         self.cost_calculator = CostCalculator()
 
         # Initialize OpenAI client
-        openai.api_key = os.getenv("OPENAI_API_KEY")
-        if not openai.api_key:
+        self.openai_api_key = os.getenv("OPENAI_API_KEY")
+        if not self.openai_api_key:
             raise GenerationError("OpenAI API key not configured")
 
         self.model = "gpt-4o"
@@ -102,6 +101,9 @@ class EpisodeGenerator:
                 # Regenerate with safer prompt
                 safe_prompt = self.safety_checker.generate_safe_prompt(prompt, config.format)
                 episode_data = self._call_openai_api(safe_prompt, config)
+
+                # Ensure format field is preserved (critical for validation)
+                episode_data["format"] = config.format.value
 
                 # Validate again
                 if not self._validate_episode_data(episode_data):
@@ -322,7 +324,7 @@ class EpisodeGenerator:
         """Call OpenAI API with structured output"""
         try:
             from openai import OpenAI
-            client = OpenAI()
+            client = OpenAI(api_key=self.openai_api_key)
 
             response = client.chat.completions.create(
                 model=self.model,
@@ -448,7 +450,7 @@ The image should:
 Provide only the image prompt text, no additional explanation."""
 
             from openai import OpenAI
-            client = OpenAI()
+            client = OpenAI(api_key=self.openai_api_key)
 
             response = client.chat.completions.create(
                 model=self.model,

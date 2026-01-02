@@ -196,33 +196,43 @@ class JobScheduler:
             raise SchedulingError(f"Job creation failed: {str(e)}")
 
     def _update_cost_tracking(self, session: Session, cost: float):
-        """Update daily cost tracking"""
+        """Update daily cost tracking using atomic upsert to prevent race conditions"""
         try:
             today = datetime.now().date()
 
-            # Get or create cost tracking record
-            cost_tracking = session.query(CostTracking).filter_by(date=today).first()
+            # Use SQLAlchemy upsert pattern to handle concurrent updates safely
+            from sqlalchemy.dialects.sqlite import insert as sqlite_upsert
 
-            if not cost_tracking:
-                cost_tracking = CostTracking(
+            # Define the upsert statement
+            upsert_stmt = (
+                sqlite_upsert(CostTracking)
+                .values(
                     date=today,
                     openai_cost=cost,
                     total_cost=cost,
                     video_count=1
                 )
-                session.add(cost_tracking)
-            else:
-                # Update existing record
-                cost_tracking.openai_cost += cost
-                cost_tracking.total_cost += cost
-                cost_tracking.video_count += 1
+                .on_conflict_do_update(
+                    index_elements=['date'],
+                    set_=dict(
+                        openai_cost=CostTracking.openai_cost + cost,
+                        total_cost=CostTracking.total_cost + cost,
+                        video_count=CostTracking.video_count + 1
+                    )
+                )
+            )
 
+            # Execute the upsert
+            session.execute(upsert_stmt)
             session.commit()
 
-            self.logger.debug("Updated cost tracking",
-                            date=today,
-                            openai_cost=cost_tracking.openai_cost,
-                            total_cost=cost_tracking.total_cost)
+            # Log the result by querying the updated record
+            updated_tracking = session.query(CostTracking).filter_by(date=today).first()
+            if updated_tracking:
+                self.logger.debug("Updated cost tracking",
+                                date=today,
+                                openai_cost=updated_tracking.openai_cost,
+                                total_cost=updated_tracking.total_cost)
 
         except Exception as e:
             session.rollback()

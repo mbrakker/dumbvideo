@@ -169,12 +169,26 @@ class ContentSafetyChecker:
             "elon musk", "jeff bezos", "mark zuckerberg",
             "donald trump", "joe biden", "kim kardashian",
             "taylor swift", "beyonce", "celebrity", "famous",
-            "president", "prime minister", "king", "queen"
+            "president", "prime minister"
         ]
 
+        # Add contextual checks for common nouns that could be false positives
+        contextual_patterns = [
+            r"\bthe king\b", r"\ble roi\b",  # Specific references
+            r"\bqueen elizabeth\b", r"\breine elisabeth\b",
+            r"\bking charles\b", r"\broi charles\b"
+        ]
+
+        # Check exact person names
         for term in person_terms:
             if term in content:
                 return False, f"Contains real person/celebrity reference: {term}"
+
+        # Check contextual patterns
+        for pattern in contextual_patterns:
+            if re.search(pattern, content, re.IGNORECASE):
+                return False, f"Contains real person/celebrity reference: {pattern}"
+
         return True, "No real people found"
 
     def _check_political_content(self, content: str) -> Tuple[bool, str]:

@@ -48,17 +48,22 @@ class VideoRenderer:
                        fps=self.default_fps,
                        duration=self.default_duration)
 
-    def render_video(self, episode_data: Dict, output_path: Optional[str] = None) -> str:
+    def render_video(self, episode_data: Dict, episode: Dict = None, output_path: Optional[str] = None) -> str:
         """
         Complete video rendering pipeline
 
         Args:
             episode_data: Episode JSON data
+            episode: Deprecated alias for episode_data (for backward compatibility)
             output_path: Optional custom output path
 
         Returns:
             Path to rendered video file
         """
+        # Handle backward compatibility for incorrect parameter name
+        if episode is not None:
+            episode_data = episode
+
         start_time = datetime.now()
         job_id = str(uuid.uuid4())
 
