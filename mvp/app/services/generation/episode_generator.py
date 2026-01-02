@@ -321,7 +321,10 @@ class EpisodeGenerator:
     def _call_openai_api(self, prompt: str, config: EpisodeConfig) -> Dict:
         """Call OpenAI API with structured output"""
         try:
-            response = openai.ChatCompletion.create(
+            from openai import OpenAI
+            client = OpenAI()
+
+            response = client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {
@@ -352,7 +355,7 @@ class EpisodeGenerator:
 
             return episode_data
 
-        except openai.error.OpenAIError as e:
+        except Exception as e:
             self.logger.error("OpenAI API error", error=str(e))
             raise GenerationError(f"OpenAI API error: {str(e)}")
         except json.JSONDecodeError as e:
@@ -444,7 +447,10 @@ The image should:
 
 Provide only the image prompt text, no additional explanation."""
 
-            response = openai.ChatCompletion.create(
+            from openai import OpenAI
+            client = OpenAI()
+
+            response = client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {
