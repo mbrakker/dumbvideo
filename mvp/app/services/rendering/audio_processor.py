@@ -11,7 +11,7 @@ import subprocess
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 from app.utils.logging import get_logger
-from app.utils.ffmpeg import FFmpegWrapper, FFmpegError
+from app.utils.ffmpeg_wrapper import FFmpegWrapper, FFmpegError
 from pydub import AudioSegment
 from pydub.effects import normalize, compress_dynamic_range
 import numpy as np

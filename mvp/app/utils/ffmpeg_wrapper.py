@@ -11,7 +11,9 @@ from typing import List, Dict, Optional, Tuple
 import tempfile
 import platform
 from app.utils.logging import get_logger
-import ffmpeg as ff
+
+# Import ffmpeg-python functions
+from ffmpeg import input, output, filter, run
 
 logger = get_logger(__name__)
 
@@ -130,8 +132,8 @@ class FFmpegWrapper:
         try:
             width, height = resolution
 
-            video_stream = ff.input(image_path, loop=1, t=duration)
-            audio_stream = ff.input(audio_path)
+            video_stream = input(image_path, loop=1, t=duration)
+            audio_stream = input(audio_path)
 
             # Basic video preparation
             video_stream = video_stream.filter("scale", width, height)
@@ -142,9 +144,8 @@ class FFmpegWrapper:
             if caption_file and os.path.exists(caption_file):
                 video_stream = self._apply_captions(video_stream, caption_file)
 
-            output = (
-                ff
-                .output(
+            output_stream = (
+                output(
                     video_stream,
                     audio_stream,
                     output_path,
@@ -160,7 +161,7 @@ class FFmpegWrapper:
             )
 
             self.logger.info("Starting video render", output=output_path, duration=duration)
-            output.run(overwrite_output=True)
+            run(output_stream, overwrite_output=True)
             self.logger.info("Video render completed", output=output_path)
 
             return output_path
@@ -260,12 +261,12 @@ class FFmpegWrapper:
             ducking: Apply sidechain compression
         """
         try:
-            voice_input = ff.input(voice_path).audio.filter("volume", f"{voice_volume}dB")
-            music_input = ff.input(music_path).audio.filter("volume", f"{music_volume}dB")
+            voice_input = input(voice_path).audio.filter("volume", f"{voice_volume}dB")
+            music_input = input(music_path).audio.filter("volume", f"{music_volume}dB")
 
             if ducking:
                 # Apply sidechain compression using the voice track as the sidechain input
-                music_input = ffmpeg.filter(
+                music_input = filter(
                     [music_input, voice_input],
                     "sidechaincompress",
                     threshold=0.05,
@@ -274,7 +275,7 @@ class FFmpegWrapper:
                     release=250
                 )
 
-            mixed_audio = ffmpeg.filter(
+            mixed_audio = filter(
                 [voice_input, music_input],
                 "amix",
                 inputs=2,
@@ -282,9 +283,8 @@ class FFmpegWrapper:
                 dropout_transition=0
             )
 
-            output = (
-                ffmpeg
-                .output(
+            output_stream = (
+                output(
                     mixed_audio,
                     output_path,
                     acodec="aac",
@@ -295,7 +295,7 @@ class FFmpegWrapper:
             )
 
             self.logger.info("Mixing audio", voice=voice_path, music=music_path)
-            output.run(overwrite_output=True)
+            run(output_stream, overwrite_output=True)
             self.logger.info("Audio mixing completed", output=output_path)
 
             return output_path

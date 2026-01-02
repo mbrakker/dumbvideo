@@ -9,7 +9,7 @@ import os
 # Add the mvp directory to the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'mvp'))
 
-from app.utils.ffmpeg import FFmpegWrapper
+from app.utils.ffmpeg_wrapper import FFmpegWrapper
 
 def test_ffmpeg_wrapper():
     """Test FFmpeg wrapper"""

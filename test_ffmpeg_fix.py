@@ -9,7 +9,8 @@ import os
 # Add the mvp directory to the path so we can import the modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'mvp'))
 
-from app.utils.ffmpeg import FFmpegWrapper, ffmpeg_wrapper
+from app.utils.ffmpeg_wrapper import FFmpegWrapper, ffmpeg_wrapper
+import ffmpeg as ff
 
 def test_ffmpeg_detection():
     """Test FFmpeg auto-detection"""
