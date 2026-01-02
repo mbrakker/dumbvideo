@@ -134,14 +134,14 @@ class CostCalculator:
     def estimate_tts_cost(
         self,
         model: str = "tts-1",
-        text_length: int = 100
+        tts_length: int = 100
     ) -> float:
         """
         Estimate cost for TTS generation
 
         Args:
             model: TTS model to use
-            text_length: Length of text in characters
+            tts_length: Length of text in characters
 
         Returns:
             Cost in EUR
@@ -154,12 +154,12 @@ class CostCalculator:
             cost_per_1000 = pricing["per_character"] * 1000  # Convert to per 1000 chars
 
             # Calculate cost
-            cost_usd = (text_length / 1000) * cost_per_1000
+            cost_usd = (tts_length / 1000) * cost_per_1000
             cost_eur = cost_usd * self.usd_to_eur
 
             self.logger.debug("TTS cost estimated",
                            model=model,
-                           text_length=text_length,
+                           text_length=tts_length,
                            cost_eur=cost_eur)
 
             return cost_eur

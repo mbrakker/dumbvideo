@@ -156,7 +156,7 @@ class Dashboard:
 
                 if automation_enabled != (automation_config.value if automation_config else False):
                     automation_config.value = automation_enabled
-                    automation_config.updated_at = datetime.utcnow()
+                    automation_config.updated_at = datetime.now(datetime.UTC)
                     session.commit()
                     st.success("Automation setting updated")
 
@@ -170,7 +170,7 @@ class Dashboard:
 
                 if kill_switch_enabled != (kill_switch_config.value if kill_switch_config else False):
                     kill_switch_config.value = kill_switch_enabled
-                    kill_switch_config.updated_at = datetime.utcnow()
+                    kill_switch_config.updated_at = datetime.now(datetime.UTC)
                     session.commit()
                     st.warning("Kill switch updated - all processing stopped")
 
@@ -188,7 +188,7 @@ class Dashboard:
 
             if st.button("Update Budget"):
                 budget_config.value = {"value": new_budget, "currency": "EUR"}
-                budget_config.updated_at = datetime.utcnow()
+                budget_config.updated_at = datetime.now(datetime.UTC)
                 session.commit()
                 st.success("Budget updated")
 
@@ -211,7 +211,7 @@ class Dashboard:
                     weight_config = session.query(FormatWeight).filter_by(format=fmt).first()
                     if weight_config:
                         weight_config.weight = weight
-                        weight_config.last_updated = datetime.utcnow()
+                        weight_config.last_updated = datetime.now(datetime.UTC)
                         weight_config.reason = "Manual update via dashboard"
                 session.commit()
                 st.success("Format weights updated")

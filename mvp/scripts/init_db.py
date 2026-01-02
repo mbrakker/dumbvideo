@@ -88,7 +88,7 @@ def init_system_config(session):
             logger.info(f"Added config: {key}")
         else:
             existing.value = value
-            existing.updated_at = datetime.utcnow()
+            existing.updated_at = datetime.now(datetime.UTC)
             logger.info(f"Updated config: {key}")
 
 if __name__ == "__main__":
