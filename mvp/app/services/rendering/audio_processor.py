@@ -28,6 +28,11 @@ class AudioProcessor:
         self.logger = get_logger(f"{__name__}.AudioProcessor")
         self.ffmpeg = FFmpegWrapper()
 
+        # Configure pydub to use our FFmpeg path
+        AudioSegment.converter = self.ffmpeg.ffmpeg_path
+        AudioSegment.ffmpeg = self.ffmpeg.ffmpeg_path
+        AudioSegment.ffprobe = self.ffmpeg.ffmpeg_path.replace("ffmpeg.exe", "ffprobe.exe")
+
         # Audio processing parameters
         self.sample_rate = 44100
         self.bitrate = "192k"
@@ -41,7 +46,8 @@ class AudioProcessor:
 
         self.logger.info("Audio processor initialized",
                        sample_rate=self.sample_rate,
-                       target_lufs=self.target_lufs)
+                       target_lufs=self.target_lufs,
+                       ffmpeg_path=self.ffmpeg.ffmpeg_path)
 
     def process_audio(self, voice_path: str, music_path: Optional[str] = None) -> str:
         """
@@ -87,6 +93,9 @@ class AudioProcessor:
 
             return output_path
 
+        except FileNotFoundError as e:
+            self.logger.error("Audio processing failed - file not found", job_id=job_id, error=str(e))
+            raise AudioProcessingError(f"Audio processing failed - file not found: {str(e)}")
         except Exception as e:
             self.logger.error("Audio processing failed", job_id=job_id, error=str(e))
             raise AudioProcessingError(f"Audio processing failed: {str(e)}")

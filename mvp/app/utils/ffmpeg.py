@@ -11,7 +11,7 @@ from typing import List, Dict, Optional, Tuple
 import tempfile
 import platform
 from app.utils.logging import get_logger
-import ffmpeg
+import ffmpeg as ff
 
 logger = get_logger(__name__)
 
@@ -41,6 +41,11 @@ class FFmpegWrapper:
                 "C:\\Program Files (x86)\\ffmpeg\\bin\\ffmpeg.exe",
                 "ffmpeg.exe"  # System PATH
             ]
+
+            # Add winget installation path
+            winget_path = os.path.expandvars("%LOCALAPPDATA%\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-*\\bin\\ffmpeg.exe")
+            possible_paths.insert(0, winget_path)
+
         else:
             # Linux/macOS
             possible_paths = ["ffmpeg", "/usr/bin/ffmpeg", "/usr/local/bin/ffmpeg"]
@@ -62,6 +67,41 @@ class FFmpegWrapper:
             return result.returncode == 0
         except:
             return False
+
+    def verify_dependencies(self) -> Dict:
+        """Verify that all required dependencies are available"""
+        try:
+            # Check FFmpeg availability
+            ffmpeg_check = self._check_command_available(self.ffmpeg_path)
+
+            # Check for common codecs and features
+            result = subprocess.run(
+                [self.ffmpeg_path, "-codecs"],
+                capture_output=True,
+                text=True,
+                shell=True
+            )
+
+            required_codecs = ["libx264", "aac", "libmp3lame"]
+            available_codecs = []
+
+            for codec in required_codecs:
+                if codec in result.stdout:
+                    available_codecs.append(codec)
+
+            return {
+                "ffmpeg_available": ffmpeg_check,
+                "ffmpeg_path": self.ffmpeg_path,
+                "available_codecs": available_codecs,
+                "missing_codecs": [c for c in required_codecs if c not in available_codecs],
+                "status": "ready" if ffmpeg_check else "error"
+            }
+        except Exception as e:
+            return {
+                "ffmpeg_available": False,
+                "error": str(e),
+                "status": "error"
+            }
 
     def render_video(
         self,
@@ -90,8 +130,8 @@ class FFmpegWrapper:
         try:
             width, height = resolution
 
-            video_stream = ffmpeg.input(image_path, loop=1, t=duration)
-            audio_stream = ffmpeg.input(audio_path)
+            video_stream = ff.input(image_path, loop=1, t=duration)
+            audio_stream = ff.input(audio_path)
 
             # Basic video preparation
             video_stream = video_stream.filter("scale", width, height)
@@ -103,7 +143,7 @@ class FFmpegWrapper:
                 video_stream = self._apply_captions(video_stream, caption_file)
 
             output = (
-                ffmpeg
+                ff
                 .output(
                     video_stream,
                     audio_stream,
@@ -125,9 +165,6 @@ class FFmpegWrapper:
 
             return output_path
 
-        except ffmpeg.Error as e:
-            self.logger.error("FFmpeg render failed", error=str(e), image=image_path, audio=audio_path)
-            raise FFmpegError(f"Video rendering failed: {str(e)}")
         except Exception as e:
             self.logger.error("Unexpected render error", error=str(e))
             raise FFmpegError(f"Unexpected error during rendering: {str(e)}")
@@ -165,7 +202,7 @@ class FFmpegWrapper:
                 video_stream = video_stream.filter("scale", width, height)
 
             return video_stream
-        except ffmpeg.Error as e:
+        except Exception as e:
             self.logger.error("Failed to apply motion", error=str(e))
             raise
 
@@ -223,8 +260,8 @@ class FFmpegWrapper:
             ducking: Apply sidechain compression
         """
         try:
-            voice_input = ffmpeg.input(voice_path).audio.filter("volume", f"{voice_volume}dB")
-            music_input = ffmpeg.input(music_path).audio.filter("volume", f"{music_volume}dB")
+            voice_input = ff.input(voice_path).audio.filter("volume", f"{voice_volume}dB")
+            music_input = ff.input(music_path).audio.filter("volume", f"{music_volume}dB")
 
             if ducking:
                 # Apply sidechain compression using the voice track as the sidechain input
@@ -286,6 +323,18 @@ class FFmpegWrapper:
                 "available": False,
                 "error": str(e)
             }
+
+    def format_error_message(self, error: Exception, context: Dict = None) -> str:
+        """Format error messages consistently for logging"""
+        context = context or {}
+        error_type = type(error).__name__
+
+        base_message = f"[{error_type}] {str(error)}"
+
+        if context:
+            context_details = ", ".join([f"{k}: {v}" for k, v in context.items()])
+            return f"{base_message} | Context: {context_details}"
+        return base_message
 
 # Global FFmpeg instance
 ffmpeg_wrapper = FFmpegWrapper()

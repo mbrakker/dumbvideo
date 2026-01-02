@@ -28,6 +28,12 @@ class VideoRenderer:
         self.logger = get_logger(f"{__name__}.VideoRenderer")
         self.ffmpeg = FFmpegWrapper()
 
+        # Configure pydub to use our FFmpeg path
+        from pydub import AudioSegment
+        AudioSegment.converter = self.ffmpeg.ffmpeg_path
+        AudioSegment.ffmpeg = self.ffmpeg.ffmpeg_path
+        AudioSegment.ffprobe = self.ffmpeg.ffmpeg_path.replace("ffmpeg.exe", "ffprobe.exe")
+
         # Rendering parameters
         self.default_resolution = (1080, 1920)  # 9:16 aspect ratio
         self.default_fps = 30
@@ -46,7 +52,8 @@ class VideoRenderer:
         self.logger.info("Video renderer initialized",
                        resolution=self.default_resolution,
                        fps=self.default_fps,
-                       duration=self.default_duration)
+                       duration=self.default_duration,
+                       ffmpeg_path=self.ffmpeg.ffmpeg_path)
 
     def render_video(self, episode_data: Dict, episode: Dict = None, output_path: Optional[str] = None) -> str:
         """
@@ -113,6 +120,10 @@ class VideoRenderer:
 
             return final_output
 
+        except FileNotFoundError as e:
+            self.logger.error("Video rendering failed - file not found", job_id=job_id, error=str(e))
+            self._cleanup_temp_files(job_temp_dir)
+            raise RenderingError(f"Rendering failed - file not found: {str(e)}")
         except Exception as e:
             self.logger.error("Video rendering failed", job_id=job_id, error=str(e))
             self._cleanup_temp_files(job_temp_dir)
