@@ -8,7 +8,7 @@ structlog==23.2.0
 pytz==2023.3
 
 # OpenAI
-openai==1.12.0
+openai==2.14.0
 
 # YouTube API
 google-api-python-client==2.112.0

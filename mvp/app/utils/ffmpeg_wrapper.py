@@ -13,6 +13,7 @@ import platform
 from app.utils.logging import get_logger
 
 # Import ffmpeg-python functions
+import ffmpeg
 from ffmpeg import input, output, filter, run
 
 logger = get_logger(__name__)
@@ -28,6 +29,13 @@ class FFmpegWrapper:
 
         if not self.ffmpeg_path:
             raise FFmpegError("FFmpeg not found. Please install FFmpeg and set FFMPEG_PATH in .env")
+
+        # Configure ffmpeg-python to use our FFmpeg path
+        ffmpeg_dir = os.path.dirname(self.ffmpeg_path)
+        current_path = os.environ.get('PATH', '')
+        if ffmpeg_dir not in current_path:
+            os.environ['PATH'] = ffmpeg_dir + os.pathsep + current_path
+        ffmpeg._ffmpeg_path = os.path.basename(self.ffmpeg_path)
 
         self.logger.info("FFmpeg initialized", path=self.ffmpeg_path)
 
