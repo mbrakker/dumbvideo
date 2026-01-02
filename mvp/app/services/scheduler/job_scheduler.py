@@ -125,7 +125,8 @@ class JobScheduler:
         try:
             today = datetime.now().date()
             daily_jobs = session.query(Job).filter(
-                Job.created_at >= datetime(today.year, today.month, today.day)
+                Job.created_at >= datetime(today.year, today.month, today.day),
+                Job.status != VideoStatus.FAILED
             ).count()
 
             available_slots = max(0, self.max_daily_videos - daily_jobs)
@@ -201,19 +202,20 @@ class JobScheduler:
 
             # Get or create cost tracking record
             cost_tracking = session.query(CostTracking).filter_by(date=today).first()
+
             if not cost_tracking:
                 cost_tracking = CostTracking(
                     date=today,
-                    openai_cost=0.0,
-                    total_cost=0.0,
-                    video_count=0
+                    openai_cost=cost,
+                    total_cost=cost,
+                    video_count=1
                 )
                 session.add(cost_tracking)
-
-            # Update costs
-            cost_tracking.openai_cost += cost
-            cost_tracking.total_cost += cost
-            cost_tracking.video_count += 1
+            else:
+                # Update existing record
+                cost_tracking.openai_cost += cost
+                cost_tracking.total_cost += cost
+                cost_tracking.video_count += 1
 
             session.commit()
 
