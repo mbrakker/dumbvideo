@@ -22,7 +22,6 @@ alembic==1.12.1
 # Video processing
 ffmpeg-python==0.2.0
 pillow==10.1.0
-moviepy==1.0.3
 
 # Audio processing
 pydub==0.25.1
@@ -36,8 +35,15 @@ streamlit-aggrid==0.3.4
 requests==2.31.0
 python-dateutil==2.8.2
 numpy==1.26.2
+httpx==0.25.2
 
 # Testing
 pytest==7.4.3
 black==23.12.1
 flake8==6.1.0
+
+# Image generation/processing
+opencv-python==4.8.1.78
+
+# Font handling
+freetype-py==2.3.0

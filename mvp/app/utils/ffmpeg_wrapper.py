@@ -216,30 +216,62 @@ class FFmpegWrapper:
             raise
 
     def _apply_captions(self, video_stream, caption_file: str):
-        """Apply caption overlays using drawtext"""
+        """Apply caption overlays using drawtext with adaptive styling"""
         try:
             with open(caption_file, "r", encoding="utf-8") as f:
                 captions = json.load(f)
 
-            font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-            font_exists = os.path.exists(font_path)
+            # Default font configuration
+            system_fonts = [
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",  # Linux
+                "/System/Library/Fonts/Arial.ttf",  # macOS
+                "/Library/Fonts/Arial.ttf",  # macOS alternative
+                "C:/Windows/Fonts/arial.ttf",  # Windows
+                "/usr/share/fonts/TTF/Arial.ttf"  # Alternative Linux
+            ]
+
+            font_path = None
+            for path in system_fonts:
+                if os.path.exists(path):
+                    font_path = path
+                    break
 
             for caption in captions:
                 start_time = caption["start_ms"] / 1000
                 end_time = caption["end_ms"] / 1000
+
+                # Use styling config if available, otherwise defaults
+                render_config = caption.get("_render_config", {})
+                font_size = render_config.get("font_size", 48)
+                stroke_width = render_config.get("stroke_width", 3)
+                y_position = render_config.get("y_position", "h-120")
+                x_position = render_config.get("x_centering", "(w-text_w)/2")
+                font_color = render_config.get("font_color", "white")
+                stroke_color = render_config.get("stroke_color", "black")
+                box = render_config.get("box", True)
+                box_color = render_config.get("box_color", "black@0.5")
+                box_border_w = render_config.get("box_border_w", 4)
+
                 drawtext_kwargs = {
                     "text": caption["text"],
-                    "fontcolor": "white",
-                    "fontsize": 48,
-                    "x": "(w-text_w)/2",
-                    "y": "h-120",
-                    "borderw": 3,
-                    "bordercolor": "black",
+                    "fontcolor": font_color,
+                    "fontsize": font_size,
+                    "x": x_position if x_position != "center" else "(w-text_w)/2",
+                    "y": y_position,
+                    "borderw": stroke_width,
+                    "bordercolor": stroke_color,
                     "enable": f"between(t,{start_time},{end_time})",
                 }
 
-                if font_exists:
+                # Add font file if available
+                if font_path:
                     drawtext_kwargs["fontfile"] = font_path
+
+                # Add box styling if enabled
+                if box:
+                    drawtext_kwargs["box"] = "1"
+                    drawtext_kwargs["boxcolor"] = box_color
+                    drawtext_kwargs["boxborderw"] = str(box_border_w)
 
                 video_stream = video_stream.filter("drawtext", **drawtext_kwargs)
 
