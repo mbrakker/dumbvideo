@@ -4,17 +4,17 @@ FFmpeg Utility Module
 Handles video rendering with FFmpeg on Windows
 """
 
-import os
-import subprocess
 import json
-from typing import List, Dict, Optional, Tuple
-import tempfile
+import os
 import platform
+import subprocess
+from typing import Dict, Optional, Tuple
+
 from app.utils.logging import get_logger
 
 # Import ffmpeg-python functions
 import ffmpeg
-from ffmpeg import input, output, filter, run
+from ffmpeg import filter, input, output, run
 
 logger = get_logger(__name__)
 
@@ -26,6 +26,9 @@ class FFmpegWrapper:
     def __init__(self, ffmpeg_path: str = None):
         self.ffmpeg_path = ffmpeg_path or self._auto_detect_ffmpeg()
         self.logger = get_logger(f"{__name__}.FFmpegWrapper")
+        self._probe_timeout_seconds = 5
+        self._dependency_cache: Optional[Dict[str, object]] = None
+        self._ffmpeg_info_cache: Optional[Dict[str, object]] = None
 
         if not self.ffmpeg_path:
             raise FFmpegError("FFmpeg not found. Please install FFmpeg and set FFMPEG_PATH in .env")
@@ -72,14 +75,19 @@ class FFmpegWrapper:
                 [command, "-version"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                shell=True
+                check=False,
+                timeout=self._probe_timeout_seconds,
             )
             return result.returncode == 0
-        except:
+        except Exception as exc:
+            self.logger.debug("FFmpeg availability check failed", command=command, error=str(exc))
             return False
 
     def verify_dependencies(self) -> Dict:
         """Verify that all required dependencies are available"""
+        if self._dependency_cache:
+            return self._dependency_cache
+
         try:
             # Check FFmpeg availability
             ffmpeg_check = self._check_command_available(self.ffmpeg_path)
@@ -89,7 +97,8 @@ class FFmpegWrapper:
                 [self.ffmpeg_path, "-codecs"],
                 capture_output=True,
                 text=True,
-                shell=True
+                check=False,
+                timeout=self._probe_timeout_seconds,
             )
 
             required_codecs = ["libx264", "aac", "libmp3lame"]
@@ -99,13 +108,14 @@ class FFmpegWrapper:
                 if codec in result.stdout:
                     available_codecs.append(codec)
 
-            return {
+            self._dependency_cache = {
                 "ffmpeg_available": ffmpeg_check,
                 "ffmpeg_path": self.ffmpeg_path,
                 "available_codecs": available_codecs,
                 "missing_codecs": [c for c in required_codecs if c not in available_codecs],
                 "status": "ready" if ffmpeg_check else "error"
             }
+            return self._dependency_cache
         except Exception as e:
             return {
                 "ffmpeg_available": False,
@@ -346,17 +356,23 @@ class FFmpegWrapper:
 
     def get_ffmpeg_info(self) -> Dict:
         """Get FFmpeg version and capabilities"""
+        if self._ffmpeg_info_cache:
+            return self._ffmpeg_info_cache
+
         try:
             result = subprocess.run(
                 [self.ffmpeg_path, "-version"],
                 capture_output=True,
-                text=True
+                text=True,
+                check=False,
+                timeout=self._probe_timeout_seconds,
             )
-            return {
+            self._ffmpeg_info_cache = {
                 "version": result.stdout.split("\n")[0] if result.stdout else "Unknown",
                 "available": True,
                 "path": self.ffmpeg_path
             }
+            return self._ffmpeg_info_cache
         except Exception as e:
             return {
                 "version": "Unknown",
@@ -376,5 +392,16 @@ class FFmpegWrapper:
             return f"{base_message} | Context: {context_details}"
         return base_message
 
-# Global FFmpeg instance
-ffmpeg_wrapper = FFmpegWrapper()
+    def readiness_probe(self) -> Dict[str, object]:
+        """
+        Lightweight readiness probe that avoids repeated subprocess calls by using cached data when available.
+        """
+        info = self.get_ffmpeg_info()
+        deps = self.verify_dependencies()
+        status = "ready" if info.get("available") and deps.get("ffmpeg_available") else "error"
+        return {
+            "status": status,
+            "ffmpeg_path": self.ffmpeg_path,
+            "version": info.get("version"),
+            "missing_codecs": deps.get("missing_codecs", []),
+        }

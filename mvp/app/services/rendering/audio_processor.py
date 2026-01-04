@@ -11,7 +11,7 @@ import subprocess
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 from app.utils.logging import get_logger
-from app.utils.ffmpeg_wrapper import FFmpegWrapper, FFmpegError
+from app.services.rendering.ffmpeg_service import get_ffmpeg_wrapper
 from pydub import AudioSegment
 from pydub.effects import normalize, compress_dynamic_range
 import numpy as np
@@ -24,9 +24,9 @@ class AudioProcessingError(Exception):
     pass
 
 class AudioProcessor:
-    def __init__(self):
+    def __init__(self, ffmpeg_wrapper=None):
         self.logger = get_logger(f"{__name__}.AudioProcessor")
-        self.ffmpeg = FFmpegWrapper()
+        self.ffmpeg = ffmpeg_wrapper or get_ffmpeg_wrapper()
 
         # Configure pydub to use our FFmpeg path
         AudioSegment.converter = self.ffmpeg.ffmpeg_path
