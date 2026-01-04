@@ -5,11 +5,11 @@ Implements OpenAI pricing calculations and budget enforcement
 """
 
 from typing import Dict, Optional, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime
 from app.utils.logging import get_logger
 from app.config.schema import VideoFormat
 import tiktoken
-import json
+from functools import lru_cache
 
 logger = get_logger(__name__)
 
@@ -20,6 +20,7 @@ class PricingError(Exception):
 class CostCalculator:
     def __init__(self):
         self.logger = get_logger(f"{__name__}.CostCalculator")
+        self._spend_tracker: Dict[str, Dict[str, float]] = {}
 
         # OpenAI pricing as of 2024 (in USD per 1M tokens)
         self.openai_pricing = {
@@ -48,7 +49,8 @@ class CostCalculator:
         self,
         model: str = "gpt-4o",
         estimated_input_tokens: int = 500,
-        estimated_output_tokens: int = 1500
+        estimated_output_tokens: int = 1500,
+        max_tokens: Optional[int] = None
     ) -> float:
         """
         Estimate cost for generating episode JSON
@@ -66,6 +68,9 @@ class CostCalculator:
                 raise PricingError(f"Unknown model: {model}")
 
             pricing = self.openai_pricing[model]
+            if max_tokens:
+                estimated_input_tokens = min(estimated_input_tokens, max_tokens)
+                estimated_output_tokens = min(estimated_output_tokens, max_tokens)
 
             # Calculate cost in USD
             input_cost = (estimated_input_tokens / 1_000_000) * pricing["input"]
@@ -87,7 +92,7 @@ class CostCalculator:
             self.logger.error("Failed to estimate episode generation cost", error=str(e))
             raise PricingError(f"Cost estimation failed: {str(e)}")
 
-    def count_tokens(self, text: str, model: str = "gpt-4o") -> int:
+    def count_tokens(self, text: str, model: str = "gpt-4o", max_tokens: Optional[int] = None) -> int:
         """
         Count tokens in text using tiktoken for accurate tokenization
 
@@ -96,17 +101,30 @@ class CostCalculator:
             model: Model to use for tokenization
 
         Returns:
-            Number of tokens
+            Number of tokens (capped if max_tokens provided)
         """
         try:
-            # Get the appropriate encoding for the model
-            encoding = tiktoken.encoding_for_model(model)
+            encoding = self._get_encoding(model)
             tokens = encoding.encode(text)
-            return len(tokens)
+            token_count = len(tokens)
         except Exception as e:
             self.logger.error("Failed to count tokens", error=str(e))
-            # Fallback to word-based estimation
-            return len(text.split()) * 1.3
+            token_count = int(len(text.split()) * 1.3)
+
+        if max_tokens is not None and token_count > max_tokens:
+            self.logger.warning(
+                "Token count exceeds configured maximum; applying cap",
+                model=model,
+                calculated_tokens=token_count,
+                max_tokens=max_tokens,
+            )
+            return max_tokens
+
+        return token_count
+
+    @lru_cache(maxsize=8)
+    def _get_encoding(self, model: str) -> tiktoken.Encoding:
+        return tiktoken.encoding_for_model(model)
 
     def estimate_image_generation_cost(
         self,
@@ -239,7 +257,8 @@ class CostCalculator:
         daily_cost: float,
         budget: float,
         video_count: int,
-        max_videos: int
+        max_videos: int,
+        date_key: Optional[str] = None
     ) -> Tuple[bool, Optional[str]]:
         """
         Check if proposed video generation complies with budget
@@ -249,17 +268,22 @@ class CostCalculator:
             budget: Daily budget limit
             video_count: Current video count
             max_videos: Maximum videos per day
+            date_key: Optional date label (YYYY-MM-DD). If omitted, uses today's date.
 
         Returns:
             Tuple of (compliant: bool, message: str)
         """
         try:
+            effective_date = date_key or datetime.utcnow().date().isoformat()
+            tracked = self.get_daily_spend(effective_date)
+            effective_cost = max(daily_cost, tracked.get("cost_eur", 0.0))
+
             # Check video count limit
             if video_count >= max_videos:
                 return False, f"Maximum daily videos reached ({max_videos})"
 
             # Check budget limit
-            if daily_cost >= budget:
+            if effective_cost >= budget:
                 return False, f"Daily budget exceeded (€{budget:.2f})"
 
             return True, "Budget compliant"
@@ -267,6 +291,39 @@ class CostCalculator:
         except Exception as e:
             self.logger.error("Budget compliance check failed", error=str(e))
             return False, f"Budget check error: {str(e)}"
+
+    def track_spend(self, date_key: str, cost_eur: float, model: str, input_tokens: int = 0, output_tokens: int = 0):
+        """
+        Track spend in-memory to avoid relying solely on caller-provided totals.
+        """
+        day_entry = self._spend_tracker.setdefault(date_key, {"cost_eur": 0.0, "input_tokens": 0, "output_tokens": 0, "events": 0})
+        day_entry["cost_eur"] += cost_eur
+        day_entry["input_tokens"] += input_tokens
+        day_entry["output_tokens"] += output_tokens
+        day_entry["events"] += 1
+        self.logger.info(
+            "Tracked spend event",
+            date=date_key,
+            model=model,
+            cost_increment=cost_eur,
+            cost_total=day_entry["cost_eur"],
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+        )
+
+    def get_daily_spend(self, date_key: str) -> Dict[str, float]:
+        """Get tracked spend for a given date."""
+        return self._spend_tracker.get(date_key, {"cost_eur": 0.0, "input_tokens": 0, "output_tokens": 0, "events": 0})
+
+    def estimate_request_cost(self, model: str, input_tokens: int, output_tokens: int) -> float:
+        """Estimate cost for a single request using cached pricing."""
+        if model not in self.openai_pricing:
+            raise PricingError(f"Unknown model: {model}")
+
+        pricing = self.openai_pricing[model]
+        input_cost = (input_tokens / 1_000_000) * pricing.get("input", 0)
+        output_cost = (output_tokens / 1_000_000) * pricing.get("output", 0)
+        return (input_cost + output_cost) * self.usd_to_eur
 
 # Global pricing instance
 pricing = CostCalculator()

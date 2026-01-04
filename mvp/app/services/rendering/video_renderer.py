@@ -12,13 +12,14 @@ import subprocess
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 from app.utils.logging import get_logger
-from app.utils.ffmpeg_wrapper import FFmpegWrapper, FFmpegError
+from app.utils.ffmpeg_wrapper import FFmpegError
 from app.config.schema import VideoFormat
 from app.db.models import Job, VideoStatus
 
 # Import services
 from app.services.rendering.image_service import ImageService, ImageGenerationError
 from app.services.rendering.tts_service import TTSService, TTSGenerationError
+from app.services.rendering.ffmpeg_service import get_ffmpeg_wrapper
 from app.contracts.image import ImageGenerationRequest, ImageFallbackRequest
 from app.contracts.audio import TTSGenerationRequest, MusicValidationRequest
 
@@ -34,9 +35,9 @@ class RenderingError(Exception):
     pass
 
 class VideoRenderer:
-    def __init__(self):
+    def __init__(self, ffmpeg_wrapper=None):
         self.logger = get_logger(f"{__name__}.VideoRenderer")
-        self.ffmpeg = FFmpegWrapper()
+        self.ffmpeg = ffmpeg_wrapper or get_ffmpeg_wrapper()
 
         # Initialize services
         self.image_service = ImageService()
