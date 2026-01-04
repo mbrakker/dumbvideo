@@ -223,10 +223,14 @@ class TTSService:
         client = openai.OpenAI(api_key=self.api_key)
 
         try:
+            # Compress text if needed before sending to API
+            sanitized_text = self._sanitize_text(request.text)
+            compressed_text = self._compress_text_for_tts(sanitized_text)
+
             response = client.audio.speech.create(
                 model=request.model,
                 voice=request.voice,
-                input=self._sanitize_text(request.text),
+                input=compressed_text,
                 speed=effective_speed,
                 response_format="mp3"
             )
@@ -273,6 +277,56 @@ class TTSService:
             text = text[:4093] + "..."
 
         return text.strip()
+
+    def _compress_text_for_tts(self, text: str, max_length: int = 4096) -> str:
+        """
+        Compress text for TTS generation while preserving meaning
+        Uses semantic compression to reduce token count
+        """
+        if len(text) <= max_length:
+            return text
+
+        try:
+            # Use OpenAI to summarize/compress the text
+            from openai import OpenAI
+            import os
+            from dotenv import load_dotenv
+
+            load_dotenv()
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                self.logger.warning("OpenAI API key not available for text compression")
+                return text[:max_length - 3] + "..."
+
+            client = OpenAI(api_key=api_key)
+
+            # Create compression prompt
+            prompt = f"""Compress this text to {max_length//2} characters while preserving the main meaning and tone.
+Original text: {text}
+Compressed version:"""
+
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a text compression assistant. Compress text while preserving meaning and tone."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                max_tokens=max_length//2,
+                temperature=0.3
+            )
+
+            compressed_text = response.choices[0].message.content.strip()
+            return compressed_text if len(compressed_text) <= max_length else compressed_text[:max_length - 3] + "..."
+
+        except Exception as e:
+            self.logger.error("Text compression failed, falling back to truncation", error=str(e))
+            return text[:max_length - 3] + "..."
 
     def _analyze_audio_duration(self, audio_data: bytes) -> float:
         """Analyze audio data to get duration"""

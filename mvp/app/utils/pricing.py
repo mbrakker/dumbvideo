@@ -8,6 +8,8 @@ from typing import Dict, Optional, Tuple
 from datetime import datetime, timedelta
 from app.utils.logging import get_logger
 from app.config.schema import VideoFormat
+import tiktoken
+import json
 
 logger = get_logger(__name__)
 
@@ -84,6 +86,27 @@ class CostCalculator:
         except Exception as e:
             self.logger.error("Failed to estimate episode generation cost", error=str(e))
             raise PricingError(f"Cost estimation failed: {str(e)}")
+
+    def count_tokens(self, text: str, model: str = "gpt-4o") -> int:
+        """
+        Count tokens in text using tiktoken for accurate tokenization
+
+        Args:
+            text: Input text to tokenize
+            model: Model to use for tokenization
+
+        Returns:
+            Number of tokens
+        """
+        try:
+            # Get the appropriate encoding for the model
+            encoding = tiktoken.encoding_for_model(model)
+            tokens = encoding.encode(text)
+            return len(tokens)
+        except Exception as e:
+            self.logger.error("Failed to count tokens", error=str(e))
+            # Fallback to word-based estimation
+            return len(text.split()) * 1.3
 
     def estimate_image_generation_cost(
         self,

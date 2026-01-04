@@ -33,6 +33,10 @@ class TestRenderingProduction:
 
     def teardown_method(self):
         """Clean up test environment"""
+        # Restore original music directory if it was changed
+        if hasattr(self, '_original_music_dir'):
+            video_renderer.music_dir = self._original_music_dir
+
         if os.path.exists(self.test_dir):
             shutil.rmtree(self.test_dir)
         logger.info("Test environment cleaned up")
@@ -210,14 +214,8 @@ class TestRenderingProduction:
         original_music_dir = video_renderer.music_dir
         video_renderer.music_dir = self.music_test_dir
 
-        # Restore after test
-        def restore_music_dir():
-            video_renderer.music_dir = original_music_dir
-
-        # Use request.addfinalizer instead
-        import pytest
-        request = self._pytest_request
-        request.addfinalizer(restore_music_dir)
+        # Store original directory for restoration in teardown
+        self._original_music_dir = original_music_dir
 
     @pytest.mark.skip(reason="Requires API keys and external services")
     def test_complete_rendering_pipeline(self):

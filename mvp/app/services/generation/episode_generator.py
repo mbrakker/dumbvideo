@@ -416,15 +416,15 @@ class EpisodeGenerator:
         return True
 
     def _calculate_actual_cost(self, prompt: str, episode_data: Dict) -> float:
-        """Calculate actual generation cost"""
-        # Count tokens (simplified estimation)
-        prompt_tokens = len(prompt.split()) * 1.3  # Approximate tokens
-        response_tokens = len(json.dumps(episode_data).split()) * 1.3
+        """Calculate actual generation cost using precise token counting"""
+        # Count tokens using tiktoken for accuracy
+        prompt_tokens = self.cost_calculator.count_tokens(prompt, self.model)
+        response_tokens = self.cost_calculator.count_tokens(json.dumps(episode_data), self.model)
 
         return self.cost_calculator.estimate_episode_generation_cost(
             model=self.model,
-            estimated_input_tokens=int(prompt_tokens),
-            estimated_output_tokens=int(response_tokens)
+            estimated_input_tokens=prompt_tokens,
+            estimated_output_tokens=response_tokens
         )
 
     def generate_image_prompt(self, episode_data: Dict) -> str:

@@ -28,6 +28,8 @@ from app.services.scheduler.job_scheduler import JobScheduler
 from app.services.analytics.metrics_collector import MetricsCollector
 from app.services.optimization.format_optimizer import FormatOptimizer
 from app.services.safety.content_safety import ContentSafetyChecker
+from app.db.models import Config, CostTracking
+from app.utils.pricing import pricing
 
 # Load environment variables
 load_dotenv()
@@ -98,7 +100,6 @@ class Worker:
         # Check database config
         session = self.Session()
         try:
-            from app.db.models import Config
             kill_switch = session.query(Config).filter_by(key="kill_switch_enabled").first()
             if kill_switch and kill_switch.value:
                 self.kill_switch_enabled = True
@@ -113,9 +114,6 @@ class Worker:
             session = self.Session()
 
             # Check budget compliance
-            from app.utils.pricing import pricing
-            from app.db.models import CostTracking
-
             today = datetime.now().date()
             cost_tracking = session.query(CostTracking).filter_by(date=today).first()
             daily_cost = cost_tracking.total_cost if cost_tracking else 0.0
