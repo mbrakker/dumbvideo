@@ -108,12 +108,10 @@ class Worker:
         finally:
             session.close()
 
-    def _schedule_new_jobs(self):
-        """Schedule new jobs based on budget and format weights"""
+    def _get_today_costs(self):
+        """Return today's spend and completed/processing video count"""
+        session = self.Session()
         try:
-            session = self.Session()
-
-            # Check budget compliance
             today = datetime.now().date()
             cost_tracking = session.query(CostTracking).filter_by(date=today).first()
             daily_cost = cost_tracking.total_cost if cost_tracking else 0.0
@@ -121,7 +119,15 @@ class Worker:
                 Job.created_at >= datetime(today.year, today.month, today.day),
                 Job.status != VideoStatus.FAILED
             ).count()
+            return daily_cost, video_count
+        finally:
+            session.close()
 
+    def _schedule_new_jobs(self):
+        """Schedule new jobs based on budget and format weights"""
+        session = self.Session()
+        try:
+            daily_cost, video_count = self._get_today_costs()
             budget_compliant, message = pricing.check_budget_compliance(
                 daily_cost=daily_cost,
                 budget=config.config.daily_budget,
@@ -155,17 +161,36 @@ class Worker:
         try:
             session = self.Session()
 
-            # Get pending jobs
-            pending_jobs = session.query(Job).filter_by(status=VideoStatus.PENDING).all()
+            # Get pending jobs capped per cycle
+            pending_jobs = session.query(Job).filter_by(status=VideoStatus.PENDING).limit(
+                config.config.max_jobs_per_cycle
+            ).all()
 
             if not pending_jobs:
                 self.logger.debug("No pending jobs", status="idle")
+                return
+
+            daily_cost, video_count = self._get_today_costs()
+            budget_compliant, message = pricing.check_budget_compliance(
+                daily_cost=daily_cost,
+                budget=config.config.daily_budget,
+                video_count=video_count,
+                max_videos=config.config.max_videos_per_day
+            )
+            if not budget_compliant:
+                self.logger.info("Budget check failed before processing", reason=message)
                 return
 
             self.logger.info("Processing jobs", count=len(pending_jobs))
 
             for job in pending_jobs:
                 try:
+                    # Mid-loop kill switch check
+                    if self._check_kill_switch():
+                        self.logger.warning("Kill switch activated mid-batch", action="stopping")
+                        self.running = False
+                        break
+
                     # Update job status
                     job.status = VideoStatus.GENERATING
                     session.commit()
@@ -192,6 +217,22 @@ class Worker:
                     job.error_message = str(e)
                     job.retry_count += 1
                     session.commit()
+
+                finally:
+                    # Update today's view of budget after each job and respect pause
+                    daily_cost, video_count = self._get_today_costs()
+                    budget_compliant, message = pricing.check_budget_compliance(
+                        daily_cost=daily_cost,
+                        budget=config.config.daily_budget,
+                        video_count=video_count,
+                        max_videos=config.config.max_videos_per_day
+                    )
+                    if not budget_compliant:
+                        self.logger.info("Budget exhausted mid-batch", reason=message)
+                        break
+
+                    if config.config.job_pause_seconds > 0:
+                        time.sleep(config.config.job_pause_seconds)
 
         except Exception as e:
             self.logger.error("Failed to process jobs", error=str(e))

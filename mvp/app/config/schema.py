@@ -39,6 +39,8 @@ class SchedulingWindow(BaseModel):
 class SystemConfig(BaseModel):
     daily_budget: float = Field(3.0, gt=0, le=100)
     max_videos_per_day: int = Field(3, ge=1, le=10)
+    max_jobs_per_cycle: int = Field(2, ge=1, le=20)
+    job_pause_seconds: float = Field(3.0, ge=0, le=300)
     default_language: str = Field("fr-FR", min_length=2, max_length=10)
     timezone: str = Field("Europe/Paris", min_length=3, max_length=50)
     scheduling_window: SchedulingWindow = SchedulingWindow()
