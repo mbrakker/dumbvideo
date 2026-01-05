@@ -15,8 +15,8 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 # Add mvp directory to path for proper imports
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "mvp"))
 
-from app.services.rendering.video_renderer import VideoRenderer
-from app.config.schema import VideoFormat
+from mvp.app.services.rendering.video_renderer import VideoRenderer
+from mvp.app.config.schema import VideoFormat
 
 def create_test_episode_data():
     """Create minimal test episode data"""
